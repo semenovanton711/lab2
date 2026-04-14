@@ -36,6 +36,7 @@ class FileServer:
                 if cmd == 'LIST':
                     files = [f for f in os.listdir(self.base_dir) if (self.base_dir / f).is_file()]
                     client.send(("OK\n" + "\n".join(files)).encode())
+
                 elif cmd == 'GET' and len(data.split()) > 1:
                     fname = data.split()[1]
                     fpath = self.base_dir / fname
@@ -49,6 +50,36 @@ class FileServer:
                             print(f"Файл {fname} отправлен")
                     else:
                         client.send(f"ERROR Файл не найден".encode())
+
+                # НОВЫЙ БЛОК: Добавление файла на сервер
+                elif cmd == 'PUT' and len(data.split()) > 1:
+                    fname = data.split()[1]
+                    fpath = self.base_dir / fname
+
+                    # Подтверждаем готовность принять файл
+                    client.send("READY".encode())
+
+                    # Получаем размер файла
+                    size_data = client.recv(1024).decode().strip()
+                    if size_data.startswith("SIZE"):
+                        file_size = int(size_data.split()[1])
+                        client.send("READY".encode())
+
+                        # Принимаем файл
+                        received = 0
+                        with open(fpath, 'wb') as f:
+                            while received < file_size:
+                                chunk = client.recv(min(4096, file_size - received))
+                                if not chunk:
+                                    break
+                                f.write(chunk)
+                                received += len(chunk)
+
+                        print(f"Файл {fname} получен ({received} байт)")
+                        client.send("OK Файл загружен".encode())
+                    else:
+                        client.send("ERROR Ошибка размера".encode())
+
                 elif cmd == 'BYE':
                     break
                 else:
